@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { ArrowLeftIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid'
+import { ArrowLeftIcon, ChevronUpIcon, ChevronDownIcon, ArrowPathIcon } from '@heroicons/react/24/solid'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -39,25 +39,57 @@ const levels: Level[] = [
     id: 2,
     name: '仁者之道',
     description: '探索仁爱之道',
-    position: { x: 30, y: 30 }, // 左上
+    position: { x: 25, y: 45 }, // 左上方
     requirements: { 道: 3, 德: 2, 仁: 5, 义: 2, 礼: 3 },
-    connections: [1],
+    connections: [1, 5],
   },
   {
     id: 3,
     name: '义之抉择',
     description: '在正义与私利之间...',
-    position: { x: 70, y: 30 }, // 右上
+    position: { x: 55, y: 25 }, // 右上方
     requirements: { 道: 4, 德: 3, 仁: 2, 义: 5, 礼: 2 },
-    connections: [1],
+    connections: [1, 6],
   },
   {
     id: 4,
     name: '礼之准则',
     description: '礼节背后的深意',
-    position: { x: 50, y: 70 }, // 下方
+    position: { x: 50, y: 75 }, // 下方
     requirements: { 道: 2, 德: 4, 仁: 3, 义: 2, 礼: 5 },
-    connections: [1],
+    connections: [1, 7],
+  },
+  {
+    id: 5,
+    name: '道法自然',
+    description: '顺应自然，探寻道的真谛',
+    position: { x: 15, y: 15 }, // 左上远处
+    requirements: { 道: 6, 德: 3, 仁: 4, 义: 2, 礼: 2 },
+    connections: [2],
+  },
+  {
+    id: 6,
+    name: '德行天下',
+    description: '以德服人，建立和谐社会',
+    position: { x: 85, y: 15 }, // 右上远处
+    requirements: { 道: 3, 德: 6, 仁: 3, 义: 4, 礼: 3 },
+    connections: [3],
+  },
+  {
+    id: 7,
+    name: '智者无忧',
+    description: '用智慧化解人生困境',
+    position: { x: 80, y: 90 }, // 下方远处
+    requirements: { 道: 4, 德: 3, 仁: 3, 义: 3, 礼: 4 },
+    connections: [4],
+  },
+  {
+    id: 8,
+    name: '大道至简',
+    description: '回归本源，领悟大道真意',
+    position: { x: 35, y: 15 }, // 最左上方
+    requirements: { 道: 5, 德: 5, 仁: 5, 义: 5, 礼: 5 },
+    connections: [5],
   },
 ]
 
@@ -108,8 +140,8 @@ export default function Levels() {
   const checkLevelAvailability = (level: Level): boolean => {
     if (!level.requirements) return true // 起始关卡总是可用
     
-    // 检查前置关卡是否已完成
-    const prerequisitesCompleted = level.connections.every(connectedId => 
+    // 检查前置关卡是否已完成（至少完成一个连接的关卡）
+    const prerequisitesCompleted = level.connections.some(connectedId => 
       completedLevels.includes(connectedId)
     )
     
@@ -122,16 +154,28 @@ export default function Levels() {
       }, 0)
     }
 
-    // 获取所有关卡的差值
-    const differences = levels
-      .filter(l => l.requirements)
-      .map(l => getDifference(playerStats, l.requirements as Stats))
+    // 获取所有已解锁或已完成关卡的连接关卡
+    const connectedLevels = levels.filter(l => 
+      // 关卡具有要求
+      l.requirements && 
+      // 该关卡未完成（已完成关卡不考虑）
+      !completedLevels.includes(l.id) &&
+      // 与已完成关卡有连接
+      l.connections.some(connId => completedLevels.includes(connId))
+    )
+    
+    // 计算所有连接关卡的差值
+    const differences = connectedLevels.map(l => 
+      getDifference(playerStats, l.requirements as Stats)
+    )
+    
+    if (differences.length === 0) return false // 如果没有连接的关卡，则不可解锁
     
     // 当前关卡的差值
     const currentDiff = getDifference(playerStats, level.requirements)
     
     // 如果当前关卡的差值是最小的，或者完全满足要求（差值为0），则可解锁
-    return currentDiff === Math.min(...differences) || currentDiff === 0
+    return currentDiff === Math.min(...differences, currentDiff) || currentDiff === 0
   }
 
   // 获取关卡状态
@@ -183,6 +227,22 @@ export default function Levels() {
     router.push(`/novel/${level.id}`)
   }
 
+  // 重置游戏状态
+  const resetGameState = () => {
+    if (confirm('确定要重置所有进度吗？这将清除所有已完成的关卡记录。')) {
+      localStorage.removeItem('completedLevels')
+      localStorage.removeItem('levelEffects')
+      setCompletedLevels([])
+      setPlayerStats({
+        道: 3,
+        德: 3,
+        仁: 3,
+        义: 3,
+        礼: 3,
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen p-6 relative">
       {/* Back Button */}
@@ -199,7 +259,18 @@ export default function Levels() {
 
       {/* Player Stats */}
       <div className="mb-8 p-4 bg-gray-800 rounded-lg">
-        <h2 className="text-xl font-bold text-white mb-4">当前属性</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-white">当前属性</h2>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={resetGameState}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center"
+          >
+            <ArrowPathIcon className="h-5 w-5 mr-2" />
+            重置游戏
+          </motion.button>
+        </div>
         <div className="grid grid-cols-5 gap-4">
           {Object.entries(playerStats).map(([stat, value]) => (
             <div key={stat} className="text-center flex flex-col items-center">
@@ -211,12 +282,14 @@ export default function Levels() {
                   className="text-white bg-purple-700 hover:bg-purple-600 rounded-t px-2 py-0.5"
                 >
                   <ChevronUpIcon className="h-4 w-4" />
+                  <span className="sr-only">+</span>
                 </button>
                 <button 
                   onClick={() => adjustStat(stat as keyof Stats, -1)}
                   className="text-white bg-purple-700 hover:bg-purple-600 rounded-b px-2 py-0.5"
                 >
                   <ChevronDownIcon className="h-4 w-4" />
+                  <span className="sr-only">-</span>
                 </button>
               </div>
             </div>
