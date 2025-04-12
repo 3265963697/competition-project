@@ -11,9 +11,11 @@
   "dependencies": {
     "@headlessui/react": "^2.2.1",
     "@heroicons/react": "^2.2.0",
+    "@types/react-beautiful-dnd": "^13.1.8",
     "framer-motion": "^12.6.5",
     "next": "15.3.0",
     "react": "^19.0.0",
+    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
