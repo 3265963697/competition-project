@@ -3,8 +3,16 @@
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { ArrowLeftIcon } from '@heroicons/react/24/solid'
-import { useState } from 'react'
-import VisualNovel, { Stats } from '../components/VisualNovel'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+export type Stats = {
+  道: number
+  德: number
+  仁: number
+  义: number
+  礼: number
+}
 
 type LevelStatus = 'locked' | 'unlocked' | 'completed'
 
@@ -54,6 +62,7 @@ const levels: Level[] = [
 ]
 
 export default function Levels() {
+  const router = useRouter()
   // 玩家属性状态
   const [playerStats, setPlayerStats] = useState<Stats>({
     道: 3,
@@ -66,6 +75,31 @@ export default function Levels() {
   // 关卡完成状态
   const [completedLevels, setCompletedLevels] = useState<number[]>([])
 
+  // 从 localStorage 加载状态
+  useEffect(() => {
+    const savedCompletedLevels = JSON.parse(localStorage.getItem('completedLevels') || '[]') as number[]
+    setCompletedLevels(savedCompletedLevels)
+
+    const levelEffects = JSON.parse(localStorage.getItem('levelEffects') || '{}') as Record<string, Partial<Stats>>
+    // 计算总的属性效果
+    const totalEffects = Object.values(levelEffects).reduce((acc: Partial<Stats>, curr: Partial<Stats>) => {
+      Object.entries(curr).forEach(([key, value]) => {
+        if (value) {
+          acc[key as keyof Stats] = (acc[key as keyof Stats] || 3) + value
+        }
+      })
+      return acc
+    }, {} as Partial<Stats>)
+
+    // 更新玩家属性
+    setPlayerStats(prev => ({
+      ...prev,
+      ...Object.fromEntries(
+        Object.entries(totalEffects).map(([key, value]) => [key, Math.max(0, Math.min(10, value || 3))])
+      ) as Stats
+    }))
+  }, [])
+
   // 视觉小说状态
   const [isNovelOpen, setIsNovelOpen] = useState(false)
   const [currentLevel, setCurrentLevel] = useState<Level | null>(null)
@@ -73,6 +107,13 @@ export default function Levels() {
   // 检查关卡是否可解锁
   const checkLevelAvailability = (level: Level): boolean => {
     if (!level.requirements) return true // 起始关卡总是可用
+    
+    // 检查前置关卡是否已完成
+    const prerequisitesCompleted = level.connections.every(connectedId => 
+      completedLevels.includes(connectedId)
+    )
+    
+    if (!prerequisitesCompleted) return false
     
     // 计算属性差值的绝对值之和
     const getDifference = (stats: Stats, requirements: Stats): number => {
@@ -113,31 +154,10 @@ export default function Levels() {
   }
 
   // 处理关卡点击
-  const handleLevelClick = async (level: Level) => {
+  const handleLevelClick = (level: Level) => {
     const status = getLevelStatus(level)
     if (status === 'locked') return
-
-    setCurrentLevel(level)
-    setIsNovelOpen(true)
-  }
-
-  // 处理视觉小说完成
-  const handleNovelComplete = (effects: Partial<Stats>) => {
-    // 更新玩家属性
-    setPlayerStats(prevStats => {
-      const newStats = { ...prevStats }
-      Object.entries(effects).forEach(([key, value]) => {
-        if (value) {
-          newStats[key as keyof Stats] = Math.max(0, Math.min(10, newStats[key as keyof Stats] + value))
-        }
-      })
-      return newStats
-    })
-
-    // 标记关卡为已完成
-    if (currentLevel) {
-      setCompletedLevels(prev => [...prev, currentLevel.id])
-    }
+    router.push(`/novel/${level.id}`)
   }
 
   return (
@@ -229,16 +249,6 @@ export default function Levels() {
           )
         })}
       </div>
-
-      {/* Visual Novel Dialog */}
-      <VisualNovel
-        isOpen={isNovelOpen}
-        onClose={() => {
-          setIsNovelOpen(false)
-          setCurrentLevel(null)
-        }}
-        onComplete={handleNovelComplete}
-      />
     </div>
   )
 } 
