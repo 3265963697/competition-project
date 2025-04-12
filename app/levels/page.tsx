@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { ArrowLeftIcon } from '@heroicons/react/24/solid'
+import { ArrowLeftIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -153,6 +153,29 @@ export default function Levels() {
     }
   }
 
+  // 调整玩家属性
+  const adjustStat = (stat: keyof Stats, amount: number) => {
+    setPlayerStats(prev => {
+      const newValue = Math.max(0, Math.min(10, prev[stat] + amount));
+      return {
+        ...prev,
+        [stat]: newValue
+      };
+    });
+  };
+
+  // 获取关卡背景颜色
+  const getLevelBackgroundColor = (status: LevelStatus): string => {
+    switch (status) {
+      case 'completed':
+        return 'rgba(16, 185, 129, 0.8)'; // 绿色
+      case 'unlocked':
+        return 'rgba(59, 130, 246, 0.8)'; // 蓝色
+      default:
+        return 'rgba(75, 85, 99, 0.8)'; // 灰色
+    }
+  };
+
   // 处理关卡点击
   const handleLevelClick = (level: Level) => {
     const status = getLevelStatus(level)
@@ -179,9 +202,23 @@ export default function Levels() {
         <h2 className="text-xl font-bold text-white mb-4">当前属性</h2>
         <div className="grid grid-cols-5 gap-4">
           {Object.entries(playerStats).map(([stat, value]) => (
-            <div key={stat} className="text-center">
+            <div key={stat} className="text-center flex flex-col items-center">
               <div className="text-lg font-bold text-white">{stat}</div>
-              <div className="text-purple-400">{value}</div>
+              <div className="text-purple-400 my-1">{value}</div>
+              <div className="flex flex-col">
+                <button 
+                  onClick={() => adjustStat(stat as keyof Stats, 1)}
+                  className="text-white bg-purple-700 hover:bg-purple-600 rounded-t px-2 py-0.5"
+                >
+                  <ChevronUpIcon className="h-4 w-4" />
+                </button>
+                <button 
+                  onClick={() => adjustStat(stat as keyof Stats, -1)}
+                  className="text-white bg-purple-700 hover:bg-purple-600 rounded-b px-2 py-0.5"
+                >
+                  <ChevronDownIcon className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -223,11 +260,12 @@ export default function Levels() {
             <motion.div
               key={level.id}
               onClick={() => handleLevelClick(level)}
-              className={`absolute w-48 p-4 rounded-xl border-2 border-opacity-20 backdrop-blur-sm shadow-lg transform -translate-x-1/2 -translate-y-1/2 ${getLevelStyle(status)}`}
+              className={`absolute w-48 p-4 rounded-xl border-2 backdrop-blur-sm shadow-lg transform -translate-x-1/2 -translate-y-1/2 ${getLevelStyle(status)}`}
               style={{
                 left: `${level.position.x}%`,
                 top: `${level.position.y}%`,
                 zIndex: 2,
+                backgroundColor: getLevelBackgroundColor(status),
                 borderColor: status === 'completed' ? '#10B981' : status === 'unlocked' ? '#3B82F6' : '#4B5563',
               }}
               whileHover={status !== 'locked' ? { scale: 1.1, y: '-55%' } : {}}
