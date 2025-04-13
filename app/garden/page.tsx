@@ -63,7 +63,7 @@ const createEmptyGrid = (): GridCell[][] => {
   const grid: GridCell[][] = [];
   for(let row = 0; row < 8; row++) {
     const currentRow: GridCell[] = [];
-    for(let col = 0; col < 7; col++) {
+    for(let col = 0; col < 15; col++) {
       currentRow.push({
         id: `cell-${row}-${col}`,
         row,
