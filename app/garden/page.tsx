@@ -91,6 +91,13 @@ export default function Garden() {
     setGrid(createEmptyGrid());
   }, []);
 
+  // Save garden layout to localStorage whenever grid changes
+  useEffect(() => {
+    if (grid.length > 0 && typeof window !== 'undefined') {
+      localStorage.setItem('gardenLayout', JSON.stringify(grid));
+    }
+  }, [grid]);
+
   // Handle inventory item click
   const handleInventoryItemClick = (item: GameItem, index: number) => {
     setSelectedItem(item);
@@ -267,6 +274,15 @@ export default function Garden() {
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors flex items-center"
               >
                 管理家园NPC
+              </motion.button>
+            </Link>
+            <Link href="/garden/road">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm transition-colors flex items-center ml-4"
+              >
+                开始经营
               </motion.button>
             </Link>
           </div>
