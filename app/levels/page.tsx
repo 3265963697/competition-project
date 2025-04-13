@@ -1,8 +1,8 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { ArrowLeftIcon, ChevronUpIcon, ChevronDownIcon, ArrowPathIcon } from '@heroicons/react/24/solid'
+import { ArrowLeftIcon, ChevronUpIcon, ChevronDownIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/solid'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -93,6 +93,18 @@ const levels: Level[] = [
   },
 ]
 
+// 关卡解锁物品映射
+const levelUnlocks = {
+  1: { type: 'npc', name: '剪纸艺人', description: '精通中国传统剪纸技艺', icon: '✂️' },
+  2: { type: 'building', name: '茶艺馆', description: '展示中国茶道文化的场所', icon: '🍵' },
+  3: { type: 'npc', name: '瓷器匠人', description: '掌握景德镇制瓷工艺', icon: '🏺' },
+  4: { type: 'building', name: '戏曲舞台', description: '传统戏曲表演的场所', icon: '🏮' },
+  5: { type: 'npc', name: '戏曲表演者', description: '精通京剧、昆曲等戏曲', icon: '🎭' },
+  6: { type: 'building', name: '瓷器工坊', description: '制作传统陶瓷的场所', icon: '🏺' },
+  7: { type: 'npc', name: '刺绣大师', description: '擅长苏绣、湘绣等刺绣艺术', icon: '🧵' },
+  8: { type: 'building', name: '刺绣坊', description: '传统刺绣工艺展示处', icon: '🧶' },
+};
+
 export default function Levels() {
   const router = useRouter()
   // 玩家属性状态
@@ -106,10 +118,108 @@ export default function Levels() {
 
   // 关卡完成状态
   const [completedLevels, setCompletedLevels] = useState<number[]>([])
+  
+  // 通知状态
+  const [notification, setNotification] = useState<{
+    visible: boolean;
+    item: typeof levelUnlocks[keyof typeof levelUnlocks] | null;
+    levelId: number | null;
+  }>({
+    visible: false,
+    item: null,
+    levelId: null
+  });
 
   // 从 localStorage 加载状态
   useEffect(() => {
+    console.log('关卡页面加载，开始检查通知');
+    
     const savedCompletedLevels = JSON.parse(localStorage.getItem('completedLevels') || '[]') as number[]
+    const previousCompletedLevels = JSON.parse(localStorage.getItem('previousCompletedLevels') || '[]') as number[]
+    
+    console.log('关卡完成状态:', {
+      savedCompletedLevels,
+      previousCompletedLevels,
+      difference: savedCompletedLevels.filter(id => !previousCompletedLevels.includes(id))
+    });
+    
+    // 首先检查是否有直接标记的新完成关卡
+    const newCompletedLevelId = localStorage.getItem('newCompletedLevel')
+    console.log('检测到新完成关卡标志:', newCompletedLevelId);
+    
+    if (newCompletedLevelId) {
+      // 清除标记
+      localStorage.removeItem('newCompletedLevel')
+      console.log('已清除新完成关卡标志');
+      
+      const levelId = Number(newCompletedLevelId)
+      const unlockedItem = levelUnlocks[levelId as keyof typeof levelUnlocks]
+      
+      console.log('解锁物品信息:', {
+        levelId,
+        unlockedItem: unlockedItem ? {...unlockedItem} : null
+      });
+      
+      if (unlockedItem) {
+        console.log('显示通知...');
+        setNotification({
+          visible: true,
+          item: unlockedItem,
+          levelId: levelId
+        })
+        
+        // 通知显示5秒后自动关闭
+        setTimeout(() => {
+          console.log('自动关闭通知');
+          setNotification(prev => ({...prev, visible: false}))
+        }, 8000) // 延长到8秒，便于观察
+      } else {
+        console.log('未找到对应关卡的解锁物品');
+      }
+      
+      // 更新之前完成的关卡记录
+      localStorage.setItem('previousCompletedLevels', JSON.stringify(savedCompletedLevels))
+    } 
+    // 备用方法：查找新完成的关卡
+    else {
+      const newlyCompletedLevels = savedCompletedLevels.filter(
+        levelId => !previousCompletedLevels.includes(levelId)
+      )
+      
+      console.log('通过比较检测到的新完成关卡:', newlyCompletedLevels);
+      
+      // 如果有新完成的关卡，显示解锁通知
+      if (newlyCompletedLevels.length > 0) {
+        const recentlyCompletedLevelId = newlyCompletedLevels[0]
+        const unlockedItem = levelUnlocks[recentlyCompletedLevelId as keyof typeof levelUnlocks]
+        
+        console.log('备用方法解锁物品:', {
+          levelId: recentlyCompletedLevelId,
+          unlockedItem: unlockedItem ? {...unlockedItem} : null
+        });
+        
+        if (unlockedItem) {
+          console.log('显示通知(备用方法)...');
+          setNotification({
+            visible: true,
+            item: unlockedItem,
+            levelId: recentlyCompletedLevelId
+          })
+          
+          // 通知显示5秒后自动关闭
+          setTimeout(() => {
+            console.log('自动关闭通知(备用方法)');
+            setNotification(prev => ({...prev, visible: false}))
+          }, 8000) // 延长到8秒，便于观察
+        } else {
+          console.log('备用方法未找到对应关卡的解锁物品');
+        }
+        
+        // 更新之前完成的关卡记录
+        localStorage.setItem('previousCompletedLevels', JSON.stringify(savedCompletedLevels))
+      }
+    }
+    
     setCompletedLevels(savedCompletedLevels)
 
     const levelEffects = JSON.parse(localStorage.getItem('levelEffects') || '{}') as Record<string, Partial<Stats>>
@@ -232,6 +342,7 @@ export default function Levels() {
     if (confirm('确定要重置所有进度吗？这将清除所有已完成的关卡记录。')) {
       localStorage.removeItem('completedLevels')
       localStorage.removeItem('levelEffects')
+      localStorage.removeItem('previousCompletedLevels')
       setCompletedLevels([])
       setPlayerStats({
         道: 3,
@@ -242,6 +353,33 @@ export default function Levels() {
       })
     }
   }
+
+  // 测试通知功能
+  const testNotification = () => {
+    // 随机选择一个关卡和对应的解锁项目
+    const randomLevelId = Math.floor(Math.random() * 8) + 1;
+    const testItem = levelUnlocks[randomLevelId as keyof typeof levelUnlocks];
+    
+    console.log('测试通知:', { randomLevelId, testItem });
+    
+    if (testItem) {
+      setNotification({
+        visible: true,
+        item: testItem,
+        levelId: randomLevelId
+      });
+      
+      // 8秒后自动关闭
+      setTimeout(() => {
+        setNotification(prev => ({...prev, visible: false}));
+      }, 8000);
+    }
+  }
+
+  // 关闭通知
+  const closeNotification = () => {
+    setNotification(prev => ({...prev, visible: false}));
+  };
 
   return (
     <div className="min-h-screen p-6 relative">
@@ -257,19 +395,72 @@ export default function Levels() {
         </motion.button>
       </Link>
 
+      {/* 物品解锁通知 */}
+      <div className="fixed bottom-0 left-0 bg-black bg-opacity-50 text-white p-2 text-xs z-50">
+        通知状态: {notification.visible ? '可见' : '隐藏'}, 
+        关卡: {notification.levelId}, 
+        物品: {notification.item ? notification.item.name : '无'}
+      </div>
+      <AnimatePresence>
+        {notification.visible && notification.item && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: 50, x: '-50%' }}
+            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-lg shadow-xl z-50 w-80 border-2 border-indigo-300"
+            style={{ boxShadow: '0 0 20px rgba(99, 102, 241, 0.5)' }}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <h3 className="text-lg font-bold flex items-center">
+                <span className="mr-2 text-xl">🎉</span> 新解锁！
+              </h3>
+              <button 
+                onClick={closeNotification} 
+                className="text-white hover:text-gray-200 bg-indigo-800 rounded-full p-1"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex items-center gap-3 bg-indigo-800 bg-opacity-40 p-2 rounded-lg">
+              <div className="text-3xl">{notification.item?.icon}</div>
+              <div>
+                <p className="font-semibold">
+                  {notification.item?.type === 'npc' ? 'NPC: ' : '建筑: '}
+                  {notification.item?.name}
+                </p>
+                <p className="text-sm text-gray-200">{notification.item?.description}</p>
+              </div>
+            </div>
+            <div className="mt-2 text-sm text-gray-200 italic">
+              完成关卡: {notification.levelId ? levels.find(l => l.id === notification.levelId)?.name : ''}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
       {/* Player Stats */}
       <div className="mb-8 p-4 bg-gray-800 rounded-lg">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-white">当前属性</h2>
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={resetGameState}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center"
-          >
-            <ArrowPathIcon className="h-5 w-5 mr-2" />
-            重置游戏
-          </motion.button>
+          <div className="flex space-x-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={testNotification}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg flex items-center"
+            >
+              测试通知
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={resetGameState}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center"
+            >
+              <ArrowPathIcon className="h-5 w-5 mr-2" />
+              重置游戏
+            </motion.button>
+          </div>
         </div>
         <div className="grid grid-cols-5 gap-4">
           {Object.entries(playerStats).map(([stat, value]) => (

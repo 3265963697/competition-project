@@ -1,8 +1,7 @@
 // Server Component
-import React from 'react'
 import NovelPageClient from './NovelPageClient'
 
+// 使用默认的 Next.js 页面组件，不使用额外的异步包装
 export default function NovelPage({ params }: { params: { levelId: string } }) {
-  const levelId = params.levelId
-  return <NovelPageClient levelId={levelId} />
+  return <NovelPageClient levelId={params.levelId} />
 } 

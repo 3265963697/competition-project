@@ -52,6 +52,13 @@ export default function NovelPageClient({ levelId }: { levelId: string }) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
   const [accumulatedEffects, setAccumulatedEffects] = useState<Partial<Stats>>({})
+  
+  // 确保 levelId 是字符串
+  const safeId = typeof levelId === 'undefined' ? '1' : String(levelId)
+
+  useEffect(() => {
+    console.log('初始化小说页面，关卡ID:', safeId)
+  }, [safeId])
 
   const currentDialog = CHAPTER_ONE_DIALOG[currentStep]
 
@@ -74,14 +81,33 @@ export default function NovelPageClient({ levelId }: { levelId: string }) {
     } else {
       // 对话结束，将效果保存到 localStorage
       const levelEffects = JSON.parse(localStorage.getItem('levelEffects') || '{}')
-      levelEffects[levelId] = accumulatedEffects
+      levelEffects[safeId] = accumulatedEffects
       localStorage.setItem('levelEffects', JSON.stringify(levelEffects))
       
       // 更新已完成关卡
       const completed = JSON.parse(localStorage.getItem('completedLevels') || '[]')
-      if (!completed.includes(Number(levelId))) {
-        completed.push(Number(levelId))
+      // 检查关卡是否为首次完成
+      const firstTimeCompleted = !completed.includes(Number(safeId))
+      
+      console.log('Novel完成状态:', { 
+        levelId: safeId, 
+        firstTimeCompleted, 
+        completed: completed.map((id: number) => Number(id)),
+        effects: accumulatedEffects 
+      })
+      
+      if (firstTimeCompleted) {
+        // 添加新完成的关卡
+        completed.push(Number(safeId))
         localStorage.setItem('completedLevels', JSON.stringify(completed))
+        
+        // 确保触发通知，有两种方式：
+        // 1. 直接设置标志通知系统有新完成的关卡
+        localStorage.setItem('newCompletedLevel', safeId)
+        console.log('设置新完成关卡标志:', { levelId: safeId })
+        
+        // 2. 不更新 previousCompletedLevels，让系统检测到差异
+        // 这里我们什么都不做，保持 previousCompletedLevels 不变
       }
       
       // 返回关卡页面
