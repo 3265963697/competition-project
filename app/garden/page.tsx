@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { ArrowLeftIcon } from '@heroicons/react/24/solid'
+import { useRouter } from 'next/navigation'
 
 // Define types for our game entities
 type ItemType = 'npc' | 'building';
@@ -76,6 +77,7 @@ const createEmptyGrid = (): GridCell[][] => {
 };
 
 export default function Garden() {
+  const router = useRouter()
   const [grid, setGrid] = useState<GridCell[][]>([]);
   const [inventory, setInventory] = useState<GameItem[]>([...npcs, ...buildings]);
   const [placedItems, setPlacedItems] = useState<PlacedItem[]>([]);
@@ -194,6 +196,19 @@ export default function Garden() {
     };
   }, [holdingItem]);
 
+  // Handle right click on an NPC
+  const handleCellRightClick = (e: React.MouseEvent, cell: GridCell) => {
+    e.preventDefault(); // Prevent default context menu
+    
+    if (cell.content && cell.content.type === 'npc') {
+      // Navigate to Garden NPC page
+      router.push(`/garden/npc/${cell.content.id}`)
+    } else if (holdingItem) {
+      // Cancel holding item if right click anywhere else
+      cancelHoldingItem(e);
+    }
+  };
+
   return (
     <div className="min-h-screen p-6" onContextMenu={cancelHoldingItem}>
       {/* Back Button */}
@@ -244,6 +259,17 @@ export default function Garden() {
               <p className="text-2xl font-bold text-white">{placedItems.reduce((acc, item) => acc + item.size, 0)}/{8*7}</p>
             </div>
           </div>
+          <div className="mt-4 flex justify-end">
+            <Link href="/npc">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors flex items-center"
+              >
+                管理家园NPC
+              </motion.button>
+            </Link>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row gap-8">
@@ -282,8 +308,10 @@ export default function Garden() {
                           className={`hex-cell 
                             ${holdingItem && !cell.content ? 'bg-green-700' : 'bg-gray-700'} 
                             ${cell.content ? 'has-content' : ''} 
+                            ${cell.content?.type === 'npc' ? 'npc-cell' : ''}
                             ${selectedCell?.row === cell.row && selectedCell?.col === cell.col ? 'selected-cell' : ''}`}
                           onClick={() => handleCellClick(cell)}
+                          onContextMenu={(e) => handleCellRightClick(e, cell)}
                           style={{
                             position: 'absolute',
                             left: `${x}px`,
@@ -433,6 +461,15 @@ export default function Garden() {
         .has-content {
           background-color: rgba(59, 130, 246, 0.5) !important;
           border: 1px solid rgba(255, 255, 255, 0.5); /* Brighter border for cells with content */
+        }
+        
+        .npc-cell {
+          background-color: rgba(124, 58, 237, 0.5) !important;
+          cursor: pointer;
+        }
+        
+        .npc-cell:hover {
+          background-color: rgba(124, 58, 237, 0.7) !important;
         }
         
         .selected-cell {

@@ -39,6 +39,16 @@ export default function Home() {
             我的家园
           </motion.button>
         </Link>
+
+        <Link href="/npc" className="w-full">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full py-4 px-8 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-semibold shadow-lg hover:from-blue-700 hover:to-cyan-700 transition-all"
+          >
+            家园NPC对话
+          </motion.button>
+        </Link>
       </div>
 
       {/* Background Decoration */}
