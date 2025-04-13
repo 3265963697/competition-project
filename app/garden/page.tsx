@@ -250,31 +250,63 @@ export default function Garden() {
           {/* Hexagonal Grid */}
           <div className="bg-white bg-opacity-10 rounded-lg p-6 flex-grow">
             <h2 className="text-xl font-bold text-white mb-4">家园布局</h2>
-            <div className="grid-container">
-              {grid.map((row, rowIndex) => (
-                <div key={`row-${rowIndex}`} className="hex-row" style={{ marginLeft: rowIndex % 2 === 0 ? '0' : '25px' }}>
-                  {row.map((cell, colIndex) => (
-                    <div 
-                      key={cell.id}
-                      className={`hex-cell 
-                        ${holdingItem && !cell.content ? 'bg-green-700' : 'bg-gray-700'} 
-                        ${cell.content ? 'has-content' : ''} 
-                        ${selectedCell?.row === cell.row && selectedCell?.col === cell.col ? 'selected-cell' : ''}`}
-                      onClick={() => handleCellClick(cell)}
-                    >
-                      {cell.content && (
-                        <div className="hex-content">
-                          <span className="item-icon">{cell.content.icon}</span>
-                          <span className="item-name">{cell.content.name}</span>
+            <div className="grid-container-wrapper">
+              <div className="grid-container">
+                {grid.map((row, rowIndex) => (
+                  <div key={`row-${rowIndex}`} className="hex-row">
+                    {row.map((cell, colIndex) => {
+                      // Constants for hexagon dimensions
+                      const hexSize = 40; // Size of hexagon (can be thought of as radius)
+                      const width = hexSize * 2; // Width of the hexagon
+                      const height = Math.sqrt(3) * hexSize; // Height factor for regular hexagon
+                      
+                      // Calculate position based on hexagonal grid math
+                      let x, y;
+                      
+                      // Implement a proper hexagonal grid layout
+                      // For even columns: cells align vertically
+                      // For odd columns: cells are offset vertically to create interlocking pattern
+                      if (colIndex % 2 === 0) {
+                        // Even columns
+                        x = colIndex * width * 0.75;
+                        y = rowIndex * height;
+                      } else {
+                        // Odd columns - offset vertically to create honeycomb
+                        x = colIndex * width * 0.75;
+                        y = (rowIndex * height) + (height * 0.5); // Offset by half height
+                      }
+                      
+                      return (
+                        <div 
+                          key={cell.id}
+                          className={`hex-cell 
+                            ${holdingItem && !cell.content ? 'bg-green-700' : 'bg-gray-700'} 
+                            ${cell.content ? 'has-content' : ''} 
+                            ${selectedCell?.row === cell.row && selectedCell?.col === cell.col ? 'selected-cell' : ''}`}
+                          onClick={() => handleCellClick(cell)}
+                          style={{
+                            position: 'absolute',
+                            left: `${x}px`,
+                            top: `${y}px`,
+                            width: `${width}px`,
+                            height: `${height}px`,
+                          }}
+                        >
+                          {cell.content && (
+                            <div className="hex-content">
+                              <span className="item-icon">{cell.content.icon}</span>
+                              <span className="item-name">{cell.content.name}</span>
+                            </div>
+                          )}
+                          <div className="hex-coordinates">
+                            {rowIndex},{colIndex}
+                          </div>
                         </div>
-                      )}
-                      <div className="hex-coordinates">
-                        {rowIndex},{colIndex}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -323,40 +355,51 @@ export default function Garden() {
       </div>
 
       <style jsx>{`
+        .grid-container-wrapper {
+          background-color: rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          padding: 30px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          overflow: hidden;
+        }
+        
         .grid-container {
-          padding: 20px;
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
+          position: relative;
+          width: 100%;
+          height: 600px; /* Fixed height to contain all hexagons */
+          margin: 0 auto;
         }
         
         .hex-row {
-          display: flex;
-          gap: 5px;
+          position: relative;
         }
         
         .hex-cell {
-          width: 80px;
-          height: 70px;
-          position: relative;
+          position: absolute;
           display: flex;
           align-items: center;
           justify-content: center;
           clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
           transition: all 0.2s ease;
           cursor: pointer;
+          border: 1px solid rgba(255, 255, 255, 0.3); /* Light border with increased opacity */
+          box-sizing: border-box; /* Include border in element size */
         }
         
         .hex-cell:hover {
           transform: scale(1.05);
           background-color: ${holdingItem ? 'rgba(74, 222, 128, 0.5)' : 'rgba(74, 222, 128, 0.2)'} !important;
+          z-index: 10;
+          border-color: rgba(255, 255, 255, 0.8); /* Brighter border on hover */
         }
         
         .hex-coordinates {
           position: absolute;
           bottom: 5px;
-          font-size: 9px;
-          color: rgba(255, 255, 255, 0.4);
+          font-size: 10px;
+          color: rgba(255, 255, 255, 0.6);
+          font-weight: 300;
+          text-shadow: 0 0 2px rgba(0, 0, 0, 0.8); /* Text shadow to make coordinates more visible */
         }
         
         .hex-content {
@@ -365,6 +408,7 @@ export default function Garden() {
           align-items: center;
           justify-content: center;
           text-align: center;
+          z-index: 2;
         }
         
         .item-icon {
@@ -388,10 +432,12 @@ export default function Garden() {
         
         .has-content {
           background-color: rgba(59, 130, 246, 0.5) !important;
+          border: 1px solid rgba(255, 255, 255, 0.5); /* Brighter border for cells with content */
         }
         
         .selected-cell {
           box-shadow: 0 0 0 2px yellow;
+          z-index: 5;
         }
       `}</style>
 
