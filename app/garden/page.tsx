@@ -43,19 +43,19 @@ interface GridCell {
 
 // Define the game entities (NPCs and buildings)
 const npcs: NPC[] = [
-  { id: 'npc-1', name: '诗人', description: '能够创作诗词', size: 1, type: 'npc', icon: '👨‍🎓' },
-  { id: 'npc-2', name: '画家', description: '能够绘制山水画', size: 1, type: 'npc', icon: '👨‍🎨' },
-  { id: 'npc-3', name: '琴师', description: '能够演奏古琴', size: 1, type: 'npc', icon: '🧙‍♂️' },
-  { id: 'npc-4', name: '儒者', description: '教授儒家经典', size: 1, type: 'npc', icon: '👴' },
-  { id: 'npc-5', name: '茶艺师', description: '精通茶道', size: 1, type: 'npc', icon: '👩‍🍳' },
+  { id: 'npc-1', name: '剪纸艺人', description: '精通中国传统剪纸技艺', size: 1, type: 'npc', icon: '✂️' },
+  { id: 'npc-2', name: '瓷器匠人', description: '掌握景德镇制瓷工艺', size: 1, type: 'npc', icon: '🏺' },
+  { id: 'npc-3', name: '戏曲表演者', description: '精通京剧、昆曲等戏曲', size: 1, type: 'npc', icon: '🎭' },
+  { id: 'npc-4', name: '刺绣大师', description: '擅长苏绣、湘绣等刺绣艺术', size: 1, type: 'npc', icon: '🧵' },
+  { id: 'npc-5', name: '茶艺师', description: '精通中国传统茶道文化', size: 1, type: 'npc', icon: '🍵' },
 ]
 
 const buildings: Building[] = [
-  { id: 'building-1', name: '竹林小径', description: '静谧幽深的竹林', size: 2, shape: [[1,1]], type: 'building', icon: '🎋' },
-  { id: 'building-2', name: '古琴亭台', description: '抚琴修心的场所', size: 4, shape: [[1,1],[1,0],[0,1],[0,0]], type: 'building', icon: '🏯' },
-  { id: 'building-3', name: '书画阁楼', description: '创作艺术的空间', size: 3, shape: [[1,0,0],[1,1,1]], type: 'building', icon: '🏛️' },
-  { id: 'building-4', name: '茶道小筑', description: '品茶悟道之处', size: 2, shape: [[1,1]], type: 'building', icon: '🏮' },
-  { id: 'building-5', name: '梅花小院', description: '赏梅品香之地', size: 2, shape: [[1,1]], type: 'building', icon: '🌸' },
+  { id: 'building-1', name: '茶艺馆', description: '展示中国茶道文化的场所', size: 2, shape: [[1,1]], type: 'building', icon: '🍵' },
+  { id: 'building-2', name: '戏曲舞台', description: '传统戏曲表演的场所', size: 4, shape: [[1,1],[1,0],[0,1],[0,0]], type: 'building', icon: '🏮' },
+  { id: 'building-3', name: '瓷器工坊', description: '制作传统陶瓷的场所', size: 3, shape: [[1,0,0],[1,1,1]], type: 'building', icon: '🏺' },
+  { id: 'building-4', name: '刺绣坊', description: '传统刺绣工艺展示处', size: 2, shape: [[1,1]], type: 'building', icon: '🧶' },
+  { id: 'building-5', name: '剪纸馆', description: '剪纸艺术的展示与制作场所', size: 2, shape: [[1,1]], type: 'building', icon: '📄' },
 ]
 
 // Create a grid of 8x7 hexagonal cells
