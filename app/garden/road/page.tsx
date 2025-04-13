@@ -4,6 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { ArrowLeftIcon } from '@heroicons/react/24/solid'
+import { createEmptyGrid, loadGardenLayout, isAdjacent } from './RoadBuilder'
+import RoadBuilder from './RoadBuilder'
+import CustomerSimulation, { 
+  getBuildingBaseConsumption, 
+  getBuildingBasePrice,
+  getNPCBonusMultiplier,
+  getNPCBonusPrice
+} from './CustomerSimulation'
 
 // Types
 type ItemType = 'npc' | 'building';
@@ -19,15 +27,15 @@ interface GameItem {
 
 interface NPC extends GameItem {
   type: 'npc';
-  bonusMultiplier?: number; // 增加建筑每次的消费量倍数
-  bonusPrice?: number; // 增加建筑每次消费的价格
+  bonusMultiplier?: number;
+  bonusPrice?: number;
 }
 
 interface Building extends GameItem {
   type: 'building';
   shape: number[][];
-  baseConsumption?: number; // 基础消费量
-  basePrice?: number; // 基础价格
+  baseConsumption?: number;
+  basePrice?: number;
 }
 
 interface PlacedItem extends GameItem {
@@ -35,10 +43,8 @@ interface PlacedItem extends GameItem {
     row: number;
     col: number;
   };
-  // 如果是建筑，添加消费相关属性
   baseConsumption?: number;
   basePrice?: number;
-  // 如果是NPC，添加加成相关属性
   bonusMultiplier?: number;
   bonusPrice?: number;
 }
@@ -58,54 +64,24 @@ interface GridCell {
   isStartPoint: boolean;
   isEndPoint: boolean;
   isValidNextCell?: boolean;
-  content: GameItem | null; // Add content from garden layout
+  content: GameItem | null;
 }
 
 interface RoadUser {
   id: string;
   type: 'normal' | 'wealthy';
-  position: number; // Index in the path array
+  position: number;
   icon: string;
-  speed: number; // Cells per second
-  coins: number; // Coins earned/carried by the user
-  lastConsumedBuilding?: string; // 最后消费的建筑ID
-  lastConsumeTime?: number; // 最后消费的时间
-  consumeCooldown: number; // 消费冷却时间（秒）
+  speed: number;
+  coins: number;
+  lastConsumedBuilding?: string;
+  lastConsumeTime?: number;
+  consumeCooldown: number;
 }
 
 // Constants
 const GRID_ROWS = 8;
 const GRID_COLS = 15;
-
-// Create empty grid
-const createEmptyGrid = (): GridCell[][] => {
-  const grid: GridCell[][] = [];
-  for (let row = 0; row < GRID_ROWS; row++) {
-    const currentRow: GridCell[] = [];
-    for (let col = 0; col < GRID_COLS; col++) {
-      currentRow.push({
-        id: `cell-${row}-${col}`,
-        row,
-        col,
-        isRoad: false,
-        isStartPoint: false,
-        isEndPoint: false,
-        isValidNextCell: false,
-        content: null
-      });
-    }
-    grid.push(currentRow);
-  }
-  return grid;
-};
-
-// Load garden layout from localStorage
-const loadGardenLayout = (): GardenCell[][] | null => {
-  if (typeof window === 'undefined') return null;
-  
-  const savedLayout = localStorage.getItem('gardenLayout');
-  return savedLayout ? JSON.parse(savedLayout) : null;
-};
 
 export default function BusinessManagement() {
   const [grid, setGrid] = useState<GridCell[][]>([]);
@@ -118,9 +94,6 @@ export default function BusinessManagement() {
   const [isEditing, setIsEditing] = useState(true);
   const [totalCoins, setTotalCoins] = useState(0);
   const [gardenLoaded, setGardenLoaded] = useState(false);
-  const animationFrameRef = useRef<number | null>(null);
-  const lastUpdateTimeRef = useRef<number>(0);
-  const coinUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [consumptionEvents, setConsumptionEvents] = useState<Array<{
     buildingId: string;
     buildingName: string;
@@ -137,15 +110,39 @@ export default function BusinessManagement() {
     }
   }>({});
 
+  // Initialize the road builder component
+  const { handleCellClick } = RoadBuilder({
+    grid,
+    setGrid,
+    selectedCells,
+    setSelectedCells,
+    startPoint,
+    setStartPoint,
+    endPoint,
+    setEndPoint,
+    isEditing
+  });
+
+  // Initialize the customer simulation component
+  const { startBusiness: startBusinessSim, resetBusiness: resetBusinessSim } = CustomerSimulation({
+    grid,
+    selectedCells,
+    businessStarted,
+    businessStartedRef,
+    users,
+    setUsers,
+    setTotalCoins,
+    setConsumptionEvents,
+    setActiveConsumptions
+  });
+  
   // Initialize the grid with garden layout
   useEffect(() => {
     // Start with an empty grid
-    const newGrid = createEmptyGrid();
+    const newGrid = createEmptyGrid(GRID_ROWS, GRID_COLS);
     setGrid(newGrid);
     
     // Get the garden layout from the main page
-    // For this to work properly, the garden page should save its state to localStorage
-    // We're simulating this by creating a copy of the grid with some content
     if (typeof window !== 'undefined') {
       try {
         // Try to get garden grid from localStorage - this would be set by the garden page
@@ -191,383 +188,28 @@ export default function BusinessManagement() {
       }
     }
   }, []);
-  
-  // Handle cell click for road building
-  const handleCellClick = (row: number, col: number) => {
-    if (!isEditing) return;
-    
-    // Check if cell is adjacent to last selected cell or is the first selection
-    const isValidSelection = selectedCells.length === 0 || 
-      isAdjacent(row, col, selectedCells[selectedCells.length - 1].row, selectedCells[selectedCells.length - 1].col);
-    
-    if (!isValidSelection) return;
-    
-    // Check if cell is already selected
-    const isCellSelected = selectedCells.some(cell => cell.row === row && cell.col === col);
-    if (isCellSelected) return;
-    
-    const newSelectedCells = [...selectedCells, { row, col }];
-    setSelectedCells(newSelectedCells);
-    
-    // Update grid
-    const newGrid = [...grid];
-    newGrid[row][col].isRoad = true;
-    
-    // If this is first cell, set as start point only
-    if (newSelectedCells.length === 1) {
-      newGrid[row][col].isStartPoint = true;
-      setStartPoint({ row, col });
-    } 
-    // If this is the second cell or later
-    else {
-      // Previous end point is now just a road
-      if (endPoint) {
-        newGrid[endPoint.row][endPoint.col].isEndPoint = false;
-      }
-      
-      // Current cell is the new end point
-      newGrid[row][col].isEndPoint = true;
-      setEndPoint({ row, col });
-    }
-    
-    // Clear previous valid next cells
-    for (let r = 0; r < GRID_ROWS; r++) {
-      for (let c = 0; c < GRID_COLS; c++) {
-        newGrid[r][c].isValidNextCell = false;
-      }
-    }
-    
-    // Mark valid next cells for the next selection
-    if (isEditing && newSelectedCells.length > 0) {
-      const lastCell = newSelectedCells[newSelectedCells.length - 1];
-      for (let r = 0; r < GRID_ROWS; r++) {
-        for (let c = 0; c < GRID_COLS; c++) {
-          // Skip if already a road
-          if (newGrid[r][c].isRoad) continue;
-          
-          // Check if adjacent to last selected cell
-          if (isAdjacent(r, c, lastCell.row, lastCell.col)) {
-            newGrid[r][c].isValidNextCell = true;
-          }
-        }
-      }
-    }
-    
-    setGrid(newGrid);
-  };
 
-  // Check if two cells are adjacent in a hexagonal grid
-  const isAdjacent = (row1: number, col1: number, row2: number, col2: number): boolean => {
-    // In a hexagonal grid with offset coordinates, each cell has 6 neighbors
-    // The pattern depends on whether the column is even or odd
-    
-    // Check if it's the same cell
-    if (row1 === row2 && col1 === col2) return false;
-    
-    // Check if column is even or odd for first cell
-    const isEvenCol1 = col1 % 2 === 0;
-    
-    // Define neighbor offsets based on column parity
-    // For even columns
-    const evenColNeighbors = [
-      [-1, 0], // Top
-      [-1, 1], // Top Right
-      [0, 1],  // Right
-      [1, 0],  // Bottom
-      [0, -1], // Left
-      [-1, -1] // Top Left
-    ];
-    
-    // For odd columns
-    const oddColNeighbors = [
-      [-1, 0], // Top
-      [0, 1],  // Top Right
-      [1, 1],  // Bottom Right
-      [1, 0],  // Bottom
-      [1, -1], // Bottom Left
-      [0, -1]  // Left
-    ];
-    
-    // Select appropriate neighbor pattern
-    const neighbors = isEvenCol1 ? evenColNeighbors : oddColNeighbors;
-    
-    // Check if second cell is a neighbor of first cell
-    for (const [rowOffset, colOffset] of neighbors) {
-      if (row1 + rowOffset === row2 && col1 + colOffset === col2) {
-        return true;
-      }
-    }
-    
-    return false;
-  };
-
-  // 使用useEffect同步businessStarted状态到ref
+  // Sync businessStarted state to ref
   useEffect(() => {
     businessStartedRef.current = businessStarted;
-    console.log('businessStarted状态已更新到:', businessStarted ? 'true' : 'false');
   }, [businessStarted]);
 
-  // Start business with visitors moving on the road
-  const startBusiness = () => {
+  // Start business wrapper function
+  const startBusinessWrapper = () => {
     if (selectedCells.length < 2) return;
     
-    console.log('开始经营函数被调用，设置businessStarted为true');
-    
-    // Generate random users
-    const newUsers: RoadUser[] = [];
-    const userCount = Math.floor(Math.random() * 5) + 3; // 3-7 users
-    
-    for (let i = 0; i < userCount; i++) {
-      const isWealthy = Math.random() > 0.7; // 30% chance for wealthy user
-      newUsers.push({
-        id: `user-${i}`,
-        type: isWealthy ? 'wealthy' : 'normal',
-        position: Math.random() * selectedCells.length, // Random position on the path
-        icon: isWealthy ? '💰' : '👤',
-        speed: (Math.random() * 0.3 + 0.1), // 降低速度，允许更多消费机会
-        coins: isWealthy ? Math.floor(Math.random() * 30) + 20 : Math.floor(Math.random() * 10) + 1, // Wealthy users have 20-50 coins, normal users 1-10
-        consumeCooldown: 5 // 降低消费冷却时间到5秒
-      });
-    }
-    
-    console.log(`生成了${userCount}个游客`);
-    setUsers(newUsers);
-    
-    // 直接设置ref的值，确保立即更新
+    // Set the businessStarted state
     businessStartedRef.current = true;
-    // 同时更新状态，保持UI一致
     setBusinessStarted(true);
     setIsEditing(false);
     
-    // 不再需要setTimeout，可以立即启动定时器
-    console.log('启动定时器，businessStartedRef.current:', businessStartedRef.current ? 'true' : 'false');
-    // Start interval to process building consumption and earnings
-    coinUpdateIntervalRef.current = setInterval(() => {
-      console.log('定时器触发，businessStartedRef.current:', businessStartedRef.current ? 'true' : 'false');
-      // Check for users near buildings and process consumption
-      handleBuildingConsumption();
-    }, 1000); // Check every second
+    // Call the startBusiness function from the CustomerSimulation component
+    startBusinessSim();
   };
 
-  // Helper function to check if a building has NPCs nearby
-  const getNPCsNearBuilding = (buildingPosition: {row: number, col: number}) => {
-    const nearbyNPCs: PlacedItem[] = [];
-    
-    // Get all NPCs from the grid
-    for (let row = 0; row < GRID_ROWS; row++) {
-      for (let col = 0; col < GRID_COLS; col++) {
-        const cell = grid[row][col];
-        if (cell.content && cell.content.type === 'npc') {
-          // Check if this NPC is adjacent to the building
-          if (isAdjacent(row, col, buildingPosition.row, buildingPosition.col)) {
-            // Get the full PlacedItem data from the original garden layout
-            const npcItem = { 
-              ...cell.content as NPC, 
-              position: { row, col },
-              bonusMultiplier: 0.2, // Default bonus multiplier for all NPCs
-              bonusPrice: Math.floor(Math.random() * 5) + 1 // Random bonus price between 1-5
-            };
-            nearbyNPCs.push(npcItem);
-          }
-        }
-      }
-    }
-    
-    return nearbyNPCs;
-  };
-
-  // New function to handle building consumption
-  const handleBuildingConsumption = () => {
-    console.log('handleBuildingConsumption被调用，businessStartedRef.current状态:', businessStartedRef.current ? 'true' : 'false');
-    
-    // 使用ref而不是state进行检查
-    if (!businessStartedRef.current) {
-      console.log('由于businessStartedRef.current为false，退出消费处理');
-      return;
-    }
-    
-    const now = Date.now();
-    console.log('===== 开始处理建筑消费 =====');
-    console.log('当前游客数量:', users.length);
-    console.log('道路格子数量:', selectedCells.length);
-    
-    let totalEarned = 0;
-    const newConsumptionEvents: Array<{
-      buildingId: string;
-      buildingName: string;
-      amount: number;
-      position: {row: number, col: number};
-      timestamp: number;
-      isSpecial?: boolean;
-    }> = [];
-    
-    // Process each user
-    setUsers(prevUsers => {
-      console.log('处理所有游客位置:', prevUsers.map(u => Math.floor(u.position)));
-      
-      return prevUsers.map(user => {
-        // Skip if user is on cooldown
-        const userLastConsumeTime = user.lastConsumeTime || 0;
-        if (now - userLastConsumeTime < user.consumeCooldown * 1000) {
-          console.log(`游客 ${user.id} 在冷却中, 剩余 ${((user.consumeCooldown * 1000) - (now - userLastConsumeTime))/1000}秒`);
-          return user;
-        }
-        
-        // Get user's current position on the path
-        const userPosition = Math.floor(user.position);
-        if (userPosition >= selectedCells.length) {
-          console.log(`游客 ${user.id} 位置超出范围:`, userPosition);
-          return user;
-        }
-        
-        const userCell = selectedCells[userPosition];
-        console.log(`游客 ${user.id} 在位置: [${userCell.row},${userCell.col}]`);
-        
-        // 检查用户所在的路径格子周围是否有建筑
-        let foundBuilding = false;
-        let consumptionAmount = 0;
-        console.log(`检查用户周围的建筑...`);
-        
-        // 记录相邻的建筑数量，便于调试
-        let adjacentBuildingCount = 0;
-        
-        for (let row = 0; row < GRID_ROWS; row++) {
-          for (let col = 0; col < GRID_COLS; col++) {
-            const cell = grid[row][col];
-            
-            // 只检查含有建筑的格子
-            if (cell.content && cell.content.type === 'building') {
-              // 检查此建筑格子是否与用户所在的路径格子相邻
-              if (isAdjacent(userCell.row, userCell.col, row, col)) {
-                adjacentBuildingCount++;
-                console.log(`找到相邻建筑: ${cell.content.name} [${row},${col}]`);
-                
-                // Skip if user already consumed this building recently
-                if (user.lastConsumedBuilding === cell.content.id) {
-                  console.log(`用户已经消费过此建筑，跳过`);
-                  continue;
-                }
-                
-                // 有一定概率进行消费（70%的概率）
-                const consumeChance = Math.random();
-                const willConsume = consumeChance > 0.3;
-                console.log(`消费概率检查: ${consumeChance.toFixed(2)}, 是否消费: ${willConsume}`);
-                
-                if (willConsume) {
-                  foundBuilding = true;
-                  
-                  // Calculate consumption amount based on building type and user type
-                  const building = cell.content as Building;
-                  const baseConsumption = building.baseConsumption || 5; // Default to 5 if not set
-                  const basePrice = building.basePrice || 10; // Default to 10 if not set
-                  
-                  // Check for nearby NPCs that can boost the building's consumption/price
-                  const nearbyNPCs = getNPCsNearBuilding({ row, col });
-                  console.log(`NPC加成: 找到 ${nearbyNPCs.length} 个相邻NPC`);
-                  
-                  // Calculate bonus multiplier from all nearby NPCs
-                  const bonusMultiplier = nearbyNPCs.reduce((total, npc) => 
-                    total + (npc.bonusMultiplier || 0), 1); // Start with 1 (100%)
-                  
-                  // Calculate bonus price from all nearby NPCs
-                  const bonusPrice = nearbyNPCs.reduce((total, npc) => 
-                    total + (npc.bonusPrice || 0), 0);
-                  
-                  // Special event - wealthy users might make large purchases (10% chance)
-                  const isSpecialPurchase = user.type === 'wealthy' && Math.random() > 0.9;
-                  const specialMultiplier = isSpecialPurchase ? Math.floor(Math.random() * 3) + 2 : 1; // 2-4x multiplier
-                  
-                  // Final consumption calculation, influenced by user type and special events
-                  consumptionAmount = Math.floor((baseConsumption * bonusMultiplier + bonusPrice) * 
-                    (user.type === 'wealthy' ? 2 : 1) * specialMultiplier); // Wealthy users pay double
-                  
-                  console.log(`消费计算: 基础${baseConsumption}*加成${bonusMultiplier.toFixed(2)}+额外${bonusPrice} * ${user.type === 'wealthy' ? '2(富裕)' : '1(普通)'} * ${isSpecialPurchase ? `${specialMultiplier}(特殊)` : '1'} = ${consumptionAmount}`);
-                  
-                  // Update user data
-                  totalEarned += consumptionAmount;
-                  
-                  // Add consumption event
-                  newConsumptionEvents.push({
-                    buildingId: building.id,
-                    buildingName: building.name,
-                    amount: consumptionAmount,
-                    position: { row, col },
-                    timestamp: now,
-                    isSpecial: isSpecialPurchase
-                  });
-                  
-                  // Add visual feedback for this building
-                  setActiveConsumptions(prev => ({
-                    ...prev,
-                    [`${row}-${col}`]: {
-                      amount: consumptionAmount,
-                      timestamp: now,
-                      isSpecial: isSpecialPurchase
-                    }
-                  }));
-                  
-                  console.log(`消费成功! 用户 ${user.id} 在 ${building.name} 消费了 ${consumptionAmount} 金币`);
-                  
-                  // Return updated user object
-                  return {
-                    ...user,
-                    lastConsumedBuilding: cell.content.id,
-                    lastConsumeTime: now,
-                    // Wealthy users might leave with some coins, normal users spend all
-                    coins: user.type === 'wealthy' ? Math.max(0, user.coins - consumptionAmount/2) : 0
-                  };
-                }
-              }
-            }
-          }
-        }
-        
-        if (adjacentBuildingCount === 0) {
-          console.log(`用户 ${user.id} 周围没有找到建筑`);
-        } else if (!foundBuilding) {
-          console.log(`用户 ${user.id} 周围有 ${adjacentBuildingCount} 个建筑，但未触发消费`);
-        }
-        
-        return user;
-      });
-    });
-    
-    // Update total coins
-    if (totalEarned > 0) {
-      console.log(`本次总收入: ${totalEarned} 金币，${newConsumptionEvents.length} 次消费`);
-      setTotalCoins(prev => prev + totalEarned);
-      
-      // Update consumption events
-      setConsumptionEvents(prev => {
-        // Add new events
-        const combined = [...prev, ...newConsumptionEvents];
-        // Keep only the latest 10 events
-        return combined.slice(-10);
-      });
-    } else {
-      // If no building consumption occurred, still add some baseline income
-      const baseIncome = Math.floor(Math.random() * users.length) + 1;
-      console.log(`无消费发生，添加基础收入: ${baseIncome} 金币`);
-      setTotalCoins(prev => prev + baseIncome);
-    }
-    
-    console.log('===== 建筑消费处理结束 =====');
-  };
-
-  // Reset business simulation
-  const resetBusiness = () => {
-    // Cancel any animation frame and interval
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    
-    if (coinUpdateIntervalRef.current) {
-      clearInterval(coinUpdateIntervalRef.current);
-      coinUpdateIntervalRef.current = null;
-    }
-    
-    // Reset state but keep the garden content
+  // Reset business wrapper function
+  const resetBusinessWrapper = () => {
+    // Reset the grid but keep the garden content
     const currentGrid = [...grid];
     const newGrid = currentGrid.map(row => 
       row.map(cell => ({
@@ -584,131 +226,13 @@ export default function BusinessManagement() {
     setStartPoint(null);
     setEndPoint(null);
     
-    // 同时更新状态和ref
+    // Update state and ref
     businessStartedRef.current = false;
     setBusinessStarted(false);
-    
-    setUsers([]);
     setIsEditing(true);
-    lastUpdateTimeRef.current = 0;
-    console.log('业务已重置，businessStartedRef.current:', businessStartedRef.current ? 'true' : 'false');
-    // Don't reset total coins - they are accumulated
-  };
-
-  // Animation loop for user movement
-  useEffect(() => {
-    if (!businessStarted || selectedCells.length < 2) return;
     
-    const animate = (time: number) => {
-      if (!lastUpdateTimeRef.current) {
-        lastUpdateTimeRef.current = time;
-      }
-      
-      const deltaTime = (time - lastUpdateTimeRef.current) / 1000; // Convert to seconds
-      lastUpdateTimeRef.current = time;
-      
-      // Update all users' positions
-      setUsers(prevUsers => 
-        prevUsers.map(user => {
-          const newPosition = user.position + user.speed * deltaTime;
-          
-          // If user reached the end, wrap around to the start
-          if (newPosition >= selectedCells.length) {
-            return { ...user, position: 0 };
-          }
-          
-          return { ...user, position: newPosition };
-        })
-      );
-      
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-    
-    animationFrameRef.current = requestAnimationFrame(animate);
-    
-    // Cleanup animation frame on unmount
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      
-      if (coinUpdateIntervalRef.current) {
-        clearInterval(coinUpdateIntervalRef.current);
-      }
-    };
-  }, [businessStarted, selectedCells.length]);
-
-  // Helper functions to get economic values for buildings and NPCs
-  const getBuildingBaseConsumption = (buildingId: string): number => {
-    // Define base consumption values for each building type
-    switch (buildingId) {
-      case 'building-1': // 茶艺馆
-        return 8;
-      case 'building-2': // 戏曲舞台
-        return 15;
-      case 'building-3': // 瓷器工坊
-        return 12;
-      case 'building-4': // 刺绣坊
-        return 10;
-      case 'building-5': // 剪纸馆
-        return 6;
-      default:
-        return 5; // Default value
-    }
-  };
-
-  const getBuildingBasePrice = (buildingId: string): number => {
-    // Define base price values for each building type
-    switch (buildingId) {
-      case 'building-1': // 茶艺馆
-        return 12;
-      case 'building-2': // 戏曲舞台
-        return 20;
-      case 'building-3': // 瓷器工坊
-        return 18;
-      case 'building-4': // 刺绣坊
-        return 15;
-      case 'building-5': // 剪纸馆
-        return 10;
-      default:
-        return 10; // Default value
-    }
-  };
-
-  const getNPCBonusMultiplier = (npcId: string): number => {
-    // Define bonus multiplier values for each NPC type
-    switch (npcId) {
-      case 'npc-1': // 剪纸艺人
-        return 0.2;
-      case 'npc-2': // 瓷器匠人
-        return 0.3;
-      case 'npc-3': // 戏曲表演者
-        return 0.5;
-      case 'npc-4': // 刺绣大师
-        return 0.25;
-      case 'npc-5': // 茶艺师
-        return 0.4;
-      default:
-        return 0.2; // Default value
-    }
-  };
-
-  const getNPCBonusPrice = (npcId: string): number => {
-    // Define bonus price values for each NPC type
-    switch (npcId) {
-      case 'npc-1': // 剪纸艺人
-        return 2;
-      case 'npc-2': // 瓷器匠人
-        return 4;
-      case 'npc-3': // 戏曲表演者
-        return 6;
-      case 'npc-4': // 刺绣大师
-        return 3;
-      case 'npc-5': // 茶艺师
-        return 5;
-      default:
-        return 2; // Default value
-    }
+    // Call the resetBusiness function from the CustomerSimulation component
+    resetBusinessSim();
   };
 
   // Add useEffect for expiring visual feedback after a delay
@@ -767,7 +291,7 @@ export default function BusinessManagement() {
             <div>
               {isEditing ? (
                 <button
-                  onClick={startBusiness}
+                  onClick={startBusinessWrapper}
                   disabled={selectedCells.length < 2}
                   className={`px-4 py-2 rounded-lg text-white ${
                     selectedCells.length < 2 
@@ -779,7 +303,7 @@ export default function BusinessManagement() {
                 </button>
               ) : (
                 <button
-                  onClick={resetBusiness}
+                  onClick={resetBusinessWrapper}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
                 >
                   重设道路
