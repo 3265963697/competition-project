@@ -116,7 +116,8 @@ export default function NovelPageClient({ levelId }: { levelId: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-6">
+    <div className="min-h-screen bg-gray-900 p-6 flex flex-col">
+      {/* 返回按钮保持在顶部 */}
       <Link href="/levels">
         <motion.button
           whileHover={{ scale: 1.1 }}
@@ -128,7 +129,9 @@ export default function NovelPageClient({ levelId }: { levelId: string }) {
         </motion.button>
       </Link>
 
-      <div className="max-w-2xl mx-auto mt-20">
+      {/* 对话容器移动到页面底部 */}
+      <div className="flex-1"></div> {/* 占位空间 */}
+      <div className="max-w-2xl mx-auto w-full fixed bottom-[2.5vh] left-1/2 transform -translate-x-1/2">
         <motion.div
           key={currentStep}
           initial={{ opacity: 0, y: 20 }}
@@ -171,4 +174,4 @@ export default function NovelPageClient({ levelId }: { levelId: string }) {
       </div>
     </div>
   )
-} 
+}
